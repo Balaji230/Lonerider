@@ -1,0 +1,149 @@
+---
+title: "Case study-infy"
+author: "Balaji"
+date: "22 December 2016"
+output:
+  word_document: default
+  pdf_document: default
+---
+#working directory
+```{r}
+getwd()
+setwd("E:/")
+```
+#Pulling data in
+```{r}
+Data_In<-read.csv("Retail_Lending.csv",header = T)
+str(Data_In)
+```
+#packages used
+```{r}
+library(plotROC)
+library(pROC)
+library(MASS)
+library(ROCR)
+```
+
+
+##changing formats
+
+# Date format Change
+
+```{r}
+Data_In$end_effective_date<-as.Date(strptime(Data_In$end_effective_date,'%d-%b-%y'))
+
+Data_In$maturity_date<-as.Date(strptime(Data_In$maturity_date,'%d-%b-%y'))
+
+Data_In$NEXT_DUE_DATE<-as.Date(strptime(Data_In$NEXT_DUE_DATE,'%d-%b-%y'))
+
+Data_In$pmt_next_due_date<-as.Date(strptime(Data_In$pmt_next_due_date,'%d-%b-%y'))
+
+```
+#Re-Converting factors
+```{r}
+
+
+Data_In$hpi_uCLTV_since_orig2<-as.numeric(Data_In$hpi_uCLTV_since_orig2)
+
+Data_In$Upd.Shaw.Fico<-as.numeric(Data_In$Upd.Shaw.Fico)
+
+Data_In$DTI<-as.numeric(Data_In$DTI)
+
+Data_In$tr_1_to_2<-as.factor(Data_In$tr_1_to_2)
+
+```
+#Splitting the data into train and test datasets into 50/50
+```{r}
+
+Data_In<-Data_In[-1,]
+smp_size <- floor(0.50 * nrow(Data_In))
+set.seed(123)
+train_ind <- sample(seq_len(nrow(Data_In)), size = smp_size)
+train <- Data_In[train_ind, ]
+test <- Data_In[-train_ind, ]
+
+```
+
+#Creating the model for WHOLE DATASET
+```{r}
+fit3<-glm(tr_1_to_2~end_effective_date+Curr.Balance+maturity_date+hpi_uCLTV_since_orig2+PAYMENT_AMOUNT+NEXT_DUE_DATE+OPEN_OR_CLOSED+Upd.Shaw.Fico+no_of_pmts_rcd+num_of_missed_pmts+Delinquency+months_to_maturity+mly_unemp+DTI+hpi_life_change, family = 'binomial', data = Data_In)
+
+
+#confidence interval
+confint(fit3)
+
+#predicting fit
+preds3<-predict.glm(fit3)
+
+#roc validation
+roc3<-roc(Data_In$tr_1_to_2~preds3)
+summary(fit3)
+plot.roc(roc3)
+```
+
+#creating model for train dataset
+```{r}
+fit1<-glm(tr_1_to_2~end_effective_date+Curr.Balance+maturity_date+hpi_uCLTV_since_orig2+PAYMENT_AMOUNT+NEXT_DUE_DATE+OPEN_OR_CLOSED+Upd.Shaw.Fico+no_of_pmts_rcd+num_of_missed_pmts+Delinquency+months_to_maturity+mly_unemp+DTI+hpi_life_change, family = 'binomial', data = train)
+
+fit50 <- fitted.values(fit1)
+Threshold50 <- rep(0,32062)
+for (i in 1:32062)
+if(fit50[i] >= 0.5) Threshold50[i] <- 1
+ 
+CrossTable(train$tr_1_to_2, Threshold50, digits=1, prop.r=F, prop.t=F, prop.chisq=F, chisq=F, data=train)
+ 
+
+
+#confidence interval
+confint(fit1)
+
+#predicting fit
+preds2<-predict.glm(fit1)
+
+#roc validation
+roc1<-roc(train$tr_1_to_2~preds2)
+summary(fit1)
+plot.roc(roc1)
+
+
+```
+
+#creating model for test dataset
+```{r}
+fit2<-glm(tr_1_to_2~Curr.Balance+maturity_date+NEXT_DUE_DATE+Upd.Shaw.Fico+num_of_missed_pmts+months_to_maturity+mly_unemp+hpi_life_change, family = 'binomial', data = test)
+
+#confidence interval
+confint(fit2)
+
+#predicting fit
+preds1<-predict.glm(fit2)
+
+#roc validation
+roc2<-roc(test$tr_1_to_2~preds1)
+summary(fit2)
+summary(fit2)
+plot.roc(roc2)
+
+
+fit4<-glm(tr_1_to_2~NEXT_DUE_DATE+Upd.Shaw.Fico+mly_unemp, family = 'binomial', data = test)
+preds4<-predict.glm(fit4)
+summary(fit4)
+roc4<-roc(test$tr_1_to_2~preds4)
+plot.roc(roc4)
+
+
+```
+#Linear Discriminant Analysis
+```{r}
+
+ldafit<-lda(tr_1_to_2~end_effective_date+Curr.Balance+maturity_date+hpi_uCLTV_since_orig2+PAYMENT_AMOUNT+NEXT_DUE_DATE+OPEN_OR_CLOSED+Upd.Shaw.Fico+no_of_pmts_rcd+num_of_missed_pmts+Delinquency+months_to_maturity+mly_unemp+DTI+hpi_life_change, data = train)
+ldafit
+lda.pred<-predict(ldafit,data=test)
+ldaclass<-lda.pred$class
+table(ldaclass,test$tr_1_to_2)
+table(ldaclass,train$tr_1_to_2)
+
+
+
+```
+
